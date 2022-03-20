@@ -1,0 +1,67 @@
+---
+- name: Install apache and php
+  hosts: webserver
+  become: yes
+  tasks:
+    - name: install apache2
+      apt:
+        name: apache2
+        update_cache: yes
+        state: absent
+    - name: install php modules
+      apt:
+        name:
+          - php 
+          - libapache2-mod-php 
+          - php-mysql 
+        state: present
+    - name: create info.php
+      copy:
+        dest: /var/www/html/info.php
+        content: |
+          <?php 
+          phpinfo(); 
+          ?>
+    - name: Restart Apache2
+      service:
+        name: apache2
+        enabled: yes
+        state: restarted
+
+- name: Install MySQL
+  hosts: database
+  tasks:
+  - name: install mysql
+    apt: name=mysql update_cache=yes cache_valid_time=3600 state=present 
+  - name: Add Python MySQL DB
+    action: $ansible_pkg_mgr pkg=python-mysqldb state=installed
+
+- name: Configure MySQL
+  hosts: database
+  tasks:
+    - name: Configure my.cnf
+      copy: src=./files/my.cnf
+            dest=/etc/mysql/my.cnf
+            owner=root
+            group=root
+            mode=0640
+      notify:
+        - restart mysql
+    
+    - name: Add mysql-user
+      mysql_user: name=mysql_service
+                  password=12345
+                  priv=*.*:ALL
+                  state=present
+      notify:
+        - start mysql
+
+  handlers:
+    - name: start mysql
+      service: name=mysql
+               enabled=yes
+               state=started
+    - name: restart mysql
+      service: name=mysql
+               enabled=yes
+               state=restarted
